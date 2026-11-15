@@ -1,0 +1,272 @@
+# Arch Linux ARM 容器配置
+# 构建时会被放到 rootfs.tar.zst 的第一个条目：/.tiny.yaml
+#
+# 注意：容器内不能运行 systemd，所有服务都需要在 command 里手动拉起。
+
+code: "arch"
+name: "Arch Linux ARM"
+description: |
+  Arch Linux ARM（aarch64）容器，默认只带命令行。
+
+  在“快捷命令”里可以一键安装 XFCE 桌面、TigerVNC、PipeWire 和中文字体；
+  安装完成后，到“功能”页启用 AVNC 或 Termux:X11 即可进入桌面。
+
+  Arch 是滚动发行版，建议定期执行“更新系统”。容器内不能运行 systemd，
+  相关服务由启动命令手动拉起。
+# 预览图使用容器目录内的相对路径；不提供时 App 会隐藏预览图区域。
+# preview: "/opt/tiny/preview.png"
+
+feature:
+  - type: "audio"
+    name: "音频播放"
+    description: |
+      启用后，从容器内持续捕获音频并在 Android 侧播放，下次启动容器后生效。
+      需要容器内安装 PipeWire 并加载 Tiny Container 的音频模块。
+    enabled: false
+
+  - type: "microphone"
+    name: "麦克风转发"
+    description: |
+      临时启用麦克风并把声音实时转发进容器。长时间开启会更耗电，用完记得关闭！
+      需要容器内安装 PipeWire 并加载 Tiny Container 的麦克风模块。
+
+  - type: "print"
+    name: "打印服务"
+    description: |
+      启用后，下次启动容器时会在 Android 侧启动 IPP 服务，把容器内的打印请求转发到 Android 打印。
+    enabled: false
+
+  - type: "storage"
+    name: "外部存储"
+    description: |
+      启用后自动把 U 盘、SD 卡挂载到容器 /mnt 下。
+      需要授予全部文件管理权限，并且要完全重启 App（在系统设置里强行停止后重新打开）才生效。
+    enabled: false
+
+  - type: "lstat-cache"
+    name: "缓存路径信息"
+    description: |
+      缓存下列路径的 lstat 信息，proot 解析路径时可直接使用，略微提速。
+      只应加入容器运行期间不会变化的路径。
+    path:
+      - $CONTAINER_DIR/usr/bin
+      - $CONTAINER_DIR/usr/lib
+      - $CONTAINER_DIR/usr/share
+      - $CONTAINER_DIR/usr
+      - $CONTAINER_DIR/etc
+    enabled: false
+
+  - type: "avnc"
+    name: "AVNC 图形界面"
+    description: |
+      启动 XFCE 桌面并通过 AVNC 显示，使用 Unix socket 传输，不经过网络。
+      需要先安装 xfce4、tigervnc、dbus、polkit、pipewire、wireplumber（见“快捷命令”）。
+    command: |
+      mkdir -p /run/dbus
+      sudo dbus-daemon --system --fork 2>/dev/null || true
+      eval "$(dbus-launch --sh-syntax)"
+      export XDG_RUNTIME_DIR="/tmp/runtime-tiny"
+      mkdir -p "$XDG_RUNTIME_DIR"
+      # tiny 不是 root，Xvnc/ICE 不会自己创建这些目录
+      sudo mkdir -p /tmp/.X11-unix /tmp/.ICE-unix
+      sudo chmod 1777 /tmp/.X11-unix /tmp/.ICE-unix
+      sudo /usr/lib/polkit-1/polkitd >/dev/null 2>&1 &
+      pipewire >/dev/null 2>&1 &
+      while [ ! -S "$XDG_RUNTIME_DIR/pipewire-0" ]; do sleep 0.1; done
+      wireplumber >/dev/null 2>&1 &
+      pipewire-pulse >/dev/null 2>&1 &
+      VNC=Xtigervnc
+      [ -x /usr/bin/Xvnc ] && VNC=Xvnc
+      "$VNC" -geometry 1440x720 -ZlibLevel=0 -pn -rfbport -1 \
+        -SendPrimary=off -SetPrimary=off -FrameRate=120 \
+        -rfbunixpath /tmp/.tiny.vnc -alwaysshared -a 5 -once -depth 24 \
+        -SecurityTypes=None -desktop "Tiny-Arch-XFCE" :6 +extension MIT-SHM >/dev/null 2>&1 &
+      while [ ! -S "/tmp/.tiny.vnc" ]; do sleep 0.1; done
+      startxfce4 >/dev/null 2>&1 &
+    link: "vnc://127.0.0.1:5906"
+    use_unix_socket: true
+    adapt_to_screen_size: true
+    scale_ratio: 0
+    enabled: false
+
+  - type: "x11"
+    args: [":6", "+extension", "MIT-SHM"]
+    name: "Termux:X11 图形界面"
+    description: |
+      通过 Termux:X11 显示 XFCE 桌面。
+      需要先安装 xfce4、dbus、polkit、pipewire、wireplumber（见“快捷命令”）。
+    command: |
+      mkdir -p /run/dbus
+      sudo dbus-daemon --system --fork 2>/dev/null || true
+      eval "$(dbus-launch --sh-syntax)"
+      export XDG_RUNTIME_DIR="/tmp/runtime-tiny"
+      mkdir -p "$XDG_RUNTIME_DIR"
+      # tiny 不是 root，Xvnc/ICE 不会自己创建这些目录
+      sudo mkdir -p /tmp/.X11-unix /tmp/.ICE-unix
+      sudo chmod 1777 /tmp/.X11-unix /tmp/.ICE-unix
+      sudo /usr/lib/polkit-1/polkitd >/dev/null 2>&1 &
+      pipewire >/dev/null 2>&1 &
+      while [ ! -S "$XDG_RUNTIME_DIR/pipewire-0" ]; do sleep 0.1; done
+      wireplumber >/dev/null 2>&1 &
+      pipewire-pulse >/dev/null 2>&1 &
+      startxfce4 >/dev/null 2>&1 &
+    enabled: false
+
+boot_command: >
+  $BIN_DIR/proot $EXTRA_ARGS -H --kill-on-exit --link2symlink --sysvipc
+  --kernel-release="Linux localhost 6.17.0-PRoot-Distro #1 SMP PREEMPT_DYNAMIC Fri, 10 Oct 2025 00:00:00 +0000 aarch64 localdomain -1"
+  -L --change-id=1000:1000 --rootfs=$CONTAINER_DIR --cwd=/home/tiny
+  --bind=/data --bind=/dev --bind=/proc --bind=/sys --bind=/dev/urandom:/dev/random
+  --bind=/proc/self/fd:/dev/fd --bind=/proc/self/fd/0:/dev/stdin --bind=/proc/self/fd/1:/dev/stdout --bind=/proc/self/fd/2:/dev/stderr
+  --bind=$CONTAINER_DIR/sys/.empty:/sys/fs/selinux
+  --bind=$CONTAINER_DIR/proc/.loadavg:/proc/loadavg
+  --bind=$CONTAINER_DIR/proc/.stat:/proc/stat
+  --bind=$CONTAINER_DIR/proc/.uptime:/proc/uptime
+  --bind=$CONTAINER_DIR/proc/.version:/proc/version
+  --bind=$CONTAINER_DIR/proc/.vmstat:/proc/vmstat
+  --bind=$CONTAINER_DIR/proc/.devices:/proc/bus/pci/devices
+  --bind=$CONTAINER_DIR/proc/.sysctl_entry_cap_last_cap:/proc/sys/kernel/cap_last_cap
+  --bind=$CONTAINER_DIR/proc/.overflowuid:/proc/sys/kernel/overflowuid
+  --bind=$CONTAINER_DIR/proc/.overflowgid:/proc/sys/kernel/overflowgid
+  --bind=$CONTAINER_DIR/proc/.sysctl_inotify_max_user_watches:/proc/sys/fs/inotify/max_user_watches
+  --bind=$CACHE_DIR/tmp:/dev/shm
+  --bind=$CACHE_DIR/tmp:/tmp
+  --bind=$CACHE_DIR/run:/run
+  --mount=$PUBLIC_DIR:/home/tiny/Public
+  --mount=/storage/self/primary:/mnt/sdcard
+  /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$EXTRA_PATH
+  LD_LIBRARY_PATH=$EXTRA_LD_LIBRARY_PATH LD_PRELOAD=$EXTRA_LD_PRELOAD
+  DISPLAY=:6 LANG=en_US.UTF-8
+  MOZ_FAKE_NO_SANDBOX=1 QTWEBENGINE_DISABLE_SANDBOX=1 ELECTRON_DISABLE_SANDBOX=1
+  HOME=/home/tiny USER=tiny $EXTRA_ENV
+  TERM=xterm-256color COLORTERM=truecolor /bin/bash -l
+
+export_command: >
+  $BIN_DIR/proot -H --kill-on-exit --link2symlink --sysvipc
+  --kernel-release="Linux localhost 6.17.0-PRoot-Distro #1 SMP PREEMPT_DYNAMIC Fri, 10 Oct 2025 00:00:00 +0000 aarch64 localdomain -1"
+  -L --rootfs=$CONTAINER_DIR --cwd=/root
+  --bind=/data --bind=/dev --bind=/proc --bind=/sys --bind=/dev/urandom:/dev/random
+  --bind=/proc/self/fd:/dev/fd --bind=/proc/self/fd/0:/dev/stdin --bind=/proc/self/fd/1:/dev/stdout --bind=/proc/self/fd/2:/dev/stderr
+  --bind=$CONTAINER_DIR/sys/.empty:/sys/fs/selinux
+  --bind=$CONTAINER_DIR/proc/.loadavg:/proc/loadavg
+  --bind=$CONTAINER_DIR/proc/.stat:/proc/stat
+  --bind=$CONTAINER_DIR/proc/.uptime:/proc/uptime
+  --bind=$CONTAINER_DIR/proc/.version:/proc/version
+  --bind=$CONTAINER_DIR/proc/.vmstat:/proc/vmstat
+  --bind=$CONTAINER_DIR/proc/.devices:/proc/bus/pci/devices
+  --bind=$CONTAINER_DIR/proc/.sysctl_entry_cap_last_cap:/proc/sys/kernel/cap_last_cap
+  --bind=$CONTAINER_DIR/proc/.overflowuid:/proc/sys/kernel/overflowuid
+  --bind=$CONTAINER_DIR/proc/.overflowgid:/proc/sys/kernel/overflowgid
+  --bind=$CONTAINER_DIR/proc/.sysctl_inotify_max_user_watches:/proc/sys/fs/inotify/max_user_watches
+  --bind=$CACHE_DIR/tmp:/dev/shm
+  --bind=$CACHE_DIR/tmp:/tmp
+  --bind=$CACHE_DIR/run:/run
+  --mount=$PUBLIC_DIR:/Public
+  /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+  LANG=en_US.UTF-8
+  TERM=xterm-256color COLORTERM=truecolor /bin/bash /opt/tiny/export.sh
+
+quick_commands:
+  - type: "command"
+    name: "更新系统"
+    description: "pacman -Syu，更新全部软件包。"
+    command: "sudo pacman -Syu --noconfirm --disable-download-timeout"
+  - type: "command"
+    name: "查看系统信息"
+    description: "查看 Manjaro 版本与内核信息。"
+    command: "cat /etc/os-release && uname -a"
+  - type: "command"
+    name: "清屏"
+    command: "clear"
+  - type: "command"
+    name: "中断"
+    description: "向当前会话发送 Ctrl+C。"
+    command: "\x03"
+  - type: "command"
+    name: "清理软件包缓存"
+    command: "sudo pacman -Scc --noconfirm"
+  - type: "commands"
+    name: "安装 XFCE 桌面"
+    description: |
+      一键安装 XFCE、TigerVNC、PipeWire 等图形环境组件。
+      安装完成后到“功能”页启用 AVNC 或 Termux:X11。
+    commands:
+      - type: "command"
+        name: "安装桌面环境"
+        description: "安装 xfce4、tigervnc、dbus、polkit、pipewire、wireplumber。"
+        command: >
+          sudo pacman -Syu --noconfirm --disable-download-timeout &&
+          sudo pacman -S --needed --noconfirm --disable-download-timeout
+          xfce4 tigervnc dbus polkit pipewire pipewire-pulse wireplumber
+          xorg-xauth xorg-xsetroot xkeyboard-config
+      - type: "command"
+        name: "安装中文字体"
+        command: "sudo pacman -S --needed --noconfirm --disable-download-timeout noto-fonts noto-fonts-cjk ttf-dejavu"
+      - type: "command"
+        name: "安装 fcitx5 输入法"
+        description: "安装后在“选项 → 杂项 → 启用 fcitx 输入法”里打开。"
+        command: "sudo pacman -S --needed --noconfirm --disable-download-timeout fcitx5 fcitx5-chinese-addons fcitx5-gtk fcitx5-qt"
+  - type: "commands"
+    name: "常用软件"
+    description: "按需安装，更多软件请使用 pacman。"
+    commands:
+      - type: "command"
+        name: "Firefox"
+        command: "sudo pacman -S --needed --noconfirm --disable-download-timeout firefox"
+      - type: "command"
+        name: "Git"
+        command: "sudo pacman -S --needed --noconfirm --disable-download-timeout git"
+      - type: "command"
+        name: "Python"
+        command: "sudo pacman -S --needed --noconfirm --disable-download-timeout python"
+
+options:
+  - type: "option"
+    name: "高分辨率支持"
+    description: |
+      启用高清模式，显示更清晰但性能更慢。
+      启用后画面通常会变大，可在“功能 → AVNC”里调整缩放。
+    env: ["GDK_SCALE=2", "QT_FONT_DPI=192"]
+    enabled: false
+
+  - type: "options"
+    name: "杂项"
+    options:
+      - type: "option"
+        name: "挂载常用目录"
+        description: |
+          把 Android 常用目录挂载到容器主目录。
+          整个外部存储已经挂载在 /mnt/sdcard，不受这里控制。
+        args:
+          - --mount=/storage/self/primary/Pictures:/home/tiny/Pictures
+          - --mount=/storage/self/primary/Music:/home/tiny/Music
+          - --mount=/storage/self/primary/Movies:/home/tiny/Videos
+          - --mount=/storage/self/primary/Download:/home/tiny/Downloads
+          - --mount=/storage/self/primary/DCIM:/home/tiny/Photos
+          - --mount=/storage/self/primary/Documents:/home/tiny/Documents
+        enabled: true
+
+      - type: "option"
+        name: "挂载常用字体目录"
+        description: |
+          挂载 Android 系统字体、容器预设字体，以及 WPS / 永中 Office 在 Android 侧读取的字体目录。
+        args:
+          - --mount=/storage/self/primary/Fonts:/usr/share/fonts/wpsm
+          - --mount=/storage/self/primary/AppFiles/Fonts:/usr/share/fonts/yozom
+          - --mount=/system/fonts:/usr/share/fonts/androidm
+          - --mount=$CONTAINER_DIR/opt/tiny/font:/usr/share/fonts/tiny
+        enabled: true
+
+      - type: "option"
+        name: "启用 fcitx 输入法"
+        description: |
+          让容器识别已安装的 fcitx 输入法，按 Ctrl + Space 切换。
+          需要先通过快捷命令安装 fcitx5。
+        args:
+          - --mount=$CONTAINER_DIR/usr/share/applications/org.fcitx.Fcitx5.desktop:/home/tiny/.config/autostart/org.fcitx.Fcitx5.desktop
+        env:
+          - SDL_IM_MODULE=fcitx
+          - XMODIFIERS=@im=fcitx
+          - QT_IM_MODULE=fcitx
+          - GTK_IM_MODULE=fcitx
+        enabled: false

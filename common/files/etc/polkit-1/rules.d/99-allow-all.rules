@@ -1,0 +1,6 @@
+// Tiny Container：允许 tiny 用户执行需要授权的图形操作（挂载、电源管理等）
+polkit.addRule(function(action, subject) {
+    if (subject.user == "tiny") {
+        return polkit.Result.YES;
+    }
+});

@@ -1,0 +1,2 @@
+# Tiny Container：容器内不做安全隔离，tiny 用户免密 sudo
+tiny ALL=(ALL:ALL) NOPASSWD: ALL
