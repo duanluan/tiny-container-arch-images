@@ -72,6 +72,7 @@
 │       ├── etc/sudoers.d/99-tiny
 │       ├── etc/polkit-1/rules.d/99-allow-all.rules
 │       └── opt/tiny/export.sh    # App 内“导出容器”时使用
+│           opt/tiny/start-avnc.sh # AVNC + XFCE 启动脚本
 ├── arch/
 │   ├── Dockerfile            # 基于官方 ArchLinuxARM-aarch64 rootfs
 │   ├── setup.sh              # 镜像源、升级、删内核/固件、装软件
