@@ -61,33 +61,12 @@ feature:
     description: |
       启动 XFCE 桌面并通过 AVNC 显示，使用 Unix socket 传输，不经过网络。
       需要先安装 xfce4、tigervnc、dbus、polkit、pipewire、wireplumber（见“快捷命令”）。
-    command: |
-      mkdir -p /run/dbus
-      sudo dbus-daemon --system --fork 2>/dev/null || true
-      eval "$(dbus-launch --sh-syntax)"
-      export XDG_RUNTIME_DIR="/tmp/runtime-tiny"
-      mkdir -p "$XDG_RUNTIME_DIR"
-      # tiny 不是 root，Xvnc/ICE 不会自己创建这些目录
-      sudo mkdir -p /tmp/.X11-unix /tmp/.ICE-unix
-      sudo chmod 1777 /tmp/.X11-unix /tmp/.ICE-unix
-      sudo /usr/lib/polkit-1/polkitd >/dev/null 2>&1 &
-      pipewire >/dev/null 2>&1 &
-      while [ ! -S "$XDG_RUNTIME_DIR/pipewire-0" ]; do sleep 0.1; done
-      wireplumber >/dev/null 2>&1 &
-      pipewire-pulse >/dev/null 2>&1 &
-      VNC=Xtigervnc
-      [ -x /usr/bin/Xvnc ] && VNC=Xvnc
-      "$VNC" -geometry 1440x720 -ZlibLevel=0 -pn -rfbport -1 \
-        -SendPrimary=off -SetPrimary=off -FrameRate=120 \
-        -rfbunixpath /tmp/.tiny.vnc -alwaysshared -a 5 -once -depth 24 \
-        -SecurityTypes=None -desktop "Tiny-Arch-XFCE" :6 +extension MIT-SHM >/dev/null 2>&1 &
-      while [ ! -S "/tmp/.tiny.vnc" ]; do sleep 0.1; done
-      startxfce4 >/dev/null 2>&1 &
+    command: "bash /opt/tiny/start-avnc.sh"
     link: "vnc://127.0.0.1:5906"
     use_unix_socket: true
     adapt_to_screen_size: true
     scale_ratio: 0
-    enabled: false
+    enabled: true
 
   - type: "x11"
     args: [":6", "+extension", "MIT-SHM"]
@@ -105,10 +84,10 @@ feature:
       sudo mkdir -p /tmp/.X11-unix /tmp/.ICE-unix
       sudo chmod 1777 /tmp/.X11-unix /tmp/.ICE-unix
       sudo /usr/lib/polkit-1/polkitd >/dev/null 2>&1 &
-      pipewire >/dev/null 2>&1 &
-      while [ ! -S "$XDG_RUNTIME_DIR/pipewire-0" ]; do sleep 0.1; done
-      wireplumber >/dev/null 2>&1 &
-      pipewire-pulse >/dev/null 2>&1 &
+      pipewire >/tmp/pipewire.log 2>&1 &
+      for i in $(seq 1 30); do [ -S "$XDG_RUNTIME_DIR/pipewire-0" ] && break; sleep 0.1; done
+      wireplumber >/tmp/wireplumber.log 2>&1 &
+      pipewire-pulse >/tmp/pipewire-pulse.log 2>&1 &
       startxfce4 >/dev/null 2>&1 &
     enabled: false
 
@@ -173,7 +152,7 @@ quick_commands:
     command: "sudo pacman -Syu --noconfirm --disable-download-timeout"
   - type: "command"
     name: "查看系统信息"
-    description: "查看 Manjaro 版本与内核信息。"
+    description: "查看 Arch 版本与内核信息。"
     command: "cat /etc/os-release && uname -a"
   - type: "command"
     name: "清屏"
