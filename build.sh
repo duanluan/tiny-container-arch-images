@@ -20,7 +20,10 @@ set -euo pipefail
 
 cd -- "$(dirname -- "$0")"
 HERE="$(pwd)"
-APP_DIR="${APP_DIR:-$HERE/../tiny-container-arch}"
+if [ -z "${APP_DIR:-}" ]; then
+    APP_DIR="$HERE/../tiny-container-arch"
+    [ -d "$HERE/../tiny_container" ] && APP_DIR="$HERE/../tiny_container"
+fi
 DIST="$HERE/dist"
 WORK="$HERE/.work"
 CACHE="$HERE/.cache"
