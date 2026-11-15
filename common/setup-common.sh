@@ -29,6 +29,7 @@ setup_common_files() {
     install -Dm440 /tmp/common/files/etc/sudoers.d/99-tiny /etc/sudoers.d/99-tiny
     install -Dm644 /tmp/common/files/etc/polkit-1/rules.d/99-allow-all.rules /etc/polkit-1/rules.d/99-allow-all.rules
     install -Dm755 /tmp/common/files/opt/tiny/export.sh /opt/tiny/export.sh
+    install -Dm755 /tmp/common/files/opt/tiny/start-avnc.sh /opt/tiny/start-avnc.sh
     mkdir -p /opt/tiny/font /opt/tiny/extra
 }
 
