@@ -26,7 +26,7 @@ pipewire-pulse >/tmp/pipewire-pulse.log 2>&1 &
 
 VNC=Xtigervnc
 [ -x /usr/bin/Xvnc ] && VNC=Xvnc
-"$VNC" -geometry 1440x720 -pn -rfbport -1 \
+"$VNC" -geometry "${AVNC_GEOMETRY:-1400x876}" -pn -rfbport -1 \
     -SendPrimary=off -SetPrimary=off -FrameRate=120 \
     -rfbunixpath /tmp/.tiny.vnc -alwaysshared -a 5 -once -depth 24 \
     -SecurityTypes=None -desktop "Tiny-Arch-XFCE" :6 +extension MIT-SHM >/tmp/xvnc.log 2>&1 &

@@ -64,7 +64,7 @@ feature:
     command: "bash /opt/tiny/start-avnc.sh"
     link: "vnc://127.0.0.1:5906"
     use_unix_socket: true
-    adapt_to_screen_size: true
+    adapt_to_screen_size: false
     scale_ratio: 0
     enabled: true
 
